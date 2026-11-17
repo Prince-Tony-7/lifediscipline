@@ -2,7 +2,7 @@
 var API=window.LD_API_URL||'';
 window.google={script:{}};
 Object.defineProperty(window.google.script,'run',{get:function(){var ok=null,bad=null;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(f){bad=f;return o}};
- ['getCheckinData','saveCheckin','getStatsData','getGoals','saveGoal','deleteGoal'].forEach(function(fn){o[fn]=function(){var args=Array.prototype.slice.call(arguments);
+ ['getCheckinData','saveCheckin','getStatsData','getGoals','saveGoal','deleteGoal','getMissingDays'].forEach(function(fn){o[fn]=function(){var args=Array.prototype.slice.call(arguments);
   fetch(API,{method:'POST',body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json()}).then(function(j){if(j.ok){if(ok)ok(j.data)}else if(bad)bad(new Error(j.error||'Something went wrong'))})
   .catch(function(){if(bad)bad(new Error('Could not reach the tracker — check your internet connection.'))})}});return o}});
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
@@ -115,4 +115,4 @@ function wireGoals(){
    google.script.run.withSuccessHandler(function(r){GOALS=r}).withFailureHandler(function(e){toast('Not deleted — '+e.message,true);loadGoals()}).deleteGoal(OWNER,KEY,g.id)}})});
  var sd=document.querySelector('[data-act=showdone]');if(sd)sd.onclick=function(){SHOWDONE=!SHOWDONE;renderGoals()};
 }
-Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){b.onclick=function(){setMode(b.dataset.m)}});boot();</script></body></html>
+Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){b.onclick=function(){setMode(b.dataset.m)}});boot();</script><script src="missing.js"></script></body></html>
