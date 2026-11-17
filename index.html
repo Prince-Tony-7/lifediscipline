@@ -146,9 +146,9 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
     var n = all.length, days = n + ' day' + (n === 1 ? '' : 's');
     var cur = all.filter(function (m) { return m.date === D.date; })[0];
     var title;
-    if (other) title = here ? (cur.partial ? '👀 ' + who + ' left ' + cur.left + ' habits empty on this day.' : '👀 ' + who + ' hasn’t logged this day yet.')
+    if (other) title = here ? (cur.partial ? '👀 ' + who + ' left ' + cur.left + ' habit' + (cur.left === 1 ? '' : 's') + ' empty on this day.' : '👀 ' + who + ' hasn’t logged this day yet.')
                             : '👀 ' + who + ' has ' + days + ' to finish';
-    else title = here ? (cur.partial ? '✏️ This day is partly done — ' + cur.left + ' habits still empty.' : '✏️ This day isn’t logged yet — fill it in and tap Save.')
+    else title = here ? (cur.partial ? '✏️ This day is partly done — ' + cur.left + ' habit' + (cur.left === 1 ? '' : 's') + ' still empty.' : '✏️ This day isn’t logged yet — fill it in and tap Save.')
                       : '⚠️ ' + days + ' to finish';
     var div = document.createElement('div');
     div.id = 'missingBanner';
