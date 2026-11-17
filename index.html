@@ -144,16 +144,19 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
     var list = all.filter(function (m) { return m.date !== D.date; });
     var here = all.some(function (m) { return m.date === D.date; });
     var n = all.length, days = n + ' day' + (n === 1 ? '' : 's');
+    var cur = all.filter(function (m) { return m.date === D.date; })[0];
     var title;
-    if (other) title = here ? '👀 ' + who + ' hasn’t logged this day yet.' : '👀 ' + who + ' hasn’t logged ' + days;
-    else title = here ? '✏️ This day isn’t logged yet — fill it in and tap Save.' : '⚠️ ' + days + ' not logged';
+    if (other) title = here ? (cur.partial ? '👀 ' + who + ' left ' + cur.left + ' habits empty on this day.' : '👀 ' + who + ' hasn’t logged this day yet.')
+                            : '👀 ' + who + ' has ' + days + ' to finish';
+    else title = here ? (cur.partial ? '✏️ This day is partly done — ' + cur.left + ' habits still empty.' : '✏️ This day isn’t logged yet — fill it in and tap Save.')
+                      : '⚠️ ' + days + ' to finish';
     var div = document.createElement('div');
     div.id = 'missingBanner';
     div.className = 'mban' + (here && !other ? ' here' : '') + (other ? ' other' : '');
     var html = '<div class="mtitle">' + title + '</div>';
     if (list.length) {
-      html += (here ? '<div class="msub">' + (other ? 'Also not logged:' : 'Also still to do:') + '</div>' : '') + '<div class="mchips">' + list.map(function (m) {
-        return '<button data-go="' + m.date + '">' + nice(m.date) + (m.partial ? ' · half done' : '') + '</button>';
+      html += (here ? '<div class="msub">' + (other ? 'Also to finish:' : 'Also still to do:') + '</div>' : '') + '<div class="mchips">' + list.map(function (m) {
+        return '<button data-go="' + m.date + '">' + nice(m.date) + (m.partial ? ' · ' + m.left + ' left' : ' · not logged') + '</button>';
       }).join('') + '</div>';
     }
     div.innerHTML = html;
@@ -173,7 +176,7 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
       LOADING[who] = false;
       MISS[who] = (r && r.missing) || [];
       badge(); banner();
-      if (who === OWNER && !TOLD && MISS[who].length) { TOLD = true; toast('⚠️ ' + MISS[who].length + ' day' + (MISS[who].length === 1 ? '' : 's') + ' not logged yet', true); }
+      if (who === OWNER && !TOLD && MISS[who].length) { TOLD = true; toast('⚠️ ' + MISS[who].length + ' day' + (MISS[who].length === 1 ? '' : 's') + ' to finish', true); }
     }).withFailureHandler(function () { LOADING[who] = false; }).getMissingDays(OWNER, KEY, who === OWNER ? null : who);
   }
   // After every render: drop your own day once it's logged, fetch the list for whoever is shown, redraw.
