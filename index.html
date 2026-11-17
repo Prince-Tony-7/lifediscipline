@@ -116,9 +116,9 @@ function wireGoals(){
  var sd=document.querySelector('[data-act=showdone]');if(sd)sd.onclick=function(){SHOWDONE=!SHOWDONE;renderGoals()};
 }
 Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){b.onclick=function(){setMode(b.dataset.m)}});boot();</script><script>
-/* Life Discipline: alert for days that weren't logged (add-on to index.html). */
+/* Life Discipline: alert for days that weren't logged — yours, or the other person's when viewing them. */
 (function () {
-  var MISSING = null, TOLD = false;
+  var MISS = {}, LOADING = {}, TOLD = false;
   function nice(k) {
     var d = new Date(k + 'T12:00:00Z');
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' +
@@ -128,7 +128,7 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
     var tab = document.querySelector('#tabs button[data-m=checkin]');
     if (!tab) return;
     var b = tab.querySelector('.mbadge');
-    var n = MISSING ? MISSING.length : 0;
+    var n = MISS[OWNER] ? MISS[OWNER].length : 0;
     if (!n) { if (b) b.remove(); return; }
     if (!b) { b = document.createElement('span'); b.className = 'mbadge'; tab.appendChild(b); }
     b.textContent = n;
@@ -137,17 +137,22 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
     var old = document.getElementById('missingBanner');
     if (old) old.remove();
     if (typeof MODE !== 'undefined' && MODE !== 'checkin') return;
-    if (!D || D.readOnly || !MISSING || !MISSING.length) return;
-    var list = MISSING.filter(function (m) { return m.date !== D.date; });
-    var here = MISSING.some(function (m) { return m.date === D.date; });
+    if (!D) return;
+    var all = MISS[D.name];
+    if (!all || !all.length) return;
+    var other = !!D.readOnly, who = D.name;
+    var list = all.filter(function (m) { return m.date !== D.date; });
+    var here = all.some(function (m) { return m.date === D.date; });
+    var n = all.length, days = n + ' day' + (n === 1 ? '' : 's');
+    var title;
+    if (other) title = here ? '👀 ' + who + ' hasn’t logged this day yet.' : '👀 ' + who + ' hasn’t logged ' + days;
+    else title = here ? '✏️ This day isn’t logged yet — fill it in and tap Save.' : '⚠️ ' + days + ' not logged';
     var div = document.createElement('div');
     div.id = 'missingBanner';
-    div.className = 'mban' + (here ? ' here' : '');
-    var html = '<div class="mtitle">' + (here
-      ? '✏️ This day isn’t logged yet — fill it in and tap Save.'
-      : '⚠️ ' + MISSING.length + ' day' + (MISSING.length === 1 ? '' : 's') + ' not logged') + '</div>';
+    div.className = 'mban' + (here && !other ? ' here' : '') + (other ? ' other' : '');
+    var html = '<div class="mtitle">' + title + '</div>';
     if (list.length) {
-      html += (here ? '<div class="msub">Also still to do:</div>' : '') + '<div class="mchips">' + list.map(function (m) {
+      html += (here ? '<div class="msub">' + (other ? 'Also not logged:' : 'Also still to do:') + '</div>' : '') + '<div class="mchips">' + list.map(function (m) {
         return '<button data-go="' + m.date + '">' + nice(m.date) + (m.partial ? ' · half done' : '') + '</button>';
       }).join('') + '</div>';
     }
@@ -161,38 +166,46 @@ Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(
       };
     });
   }
-  function refresh() {
-    if (!OWNER || !KEY) return;
+  function refresh(who) {
+    if (!OWNER || !KEY || !who || LOADING[who]) return;
+    LOADING[who] = true;
     google.script.run.withSuccessHandler(function (r) {
-      MISSING = (r && r.missing) || [];
+      LOADING[who] = false;
+      MISS[who] = (r && r.missing) || [];
       badge(); banner();
-      if (!TOLD && MISSING.length) { TOLD = true; toast('⚠️ ' + MISSING.length + ' day' + (MISSING.length === 1 ? '' : 's') + ' not logged yet', true); }
-    }).withFailureHandler(function () { /* script not updated yet — no alert */ }).getMissingDays(OWNER, KEY);
+      if (who === OWNER && !TOLD && MISS[who].length) { TOLD = true; toast('⚠️ ' + MISS[who].length + ' day' + (MISS[who].length === 1 ? '' : 's') + ' not logged yet', true); }
+    }).withFailureHandler(function () { LOADING[who] = false; }).getMissingDays(OWNER, KEY, who === OWNER ? null : who);
   }
-  // Hook into the page: after every render, drop days that are now logged and redraw the alert.
+  // After every render: drop your own day once it's logged, fetch the list for whoever is shown, redraw.
   var orig = window.render;
   window.render = function () {
     orig.apply(this, arguments);
-    if (MISSING && D && !D.readOnly && D.summary && D.summary.logged) {
-      MISSING = MISSING.filter(function (m) { return m.date !== D.date; });
+    if (D && !D.readOnly && MISS[OWNER] && D.summary && D.summary.logged) {
+      MISS[OWNER] = MISS[OWNER].filter(function (m) { return m.date !== D.date; });
       badge();
     }
     banner();
-    if (MISSING === null && D && OWNER) { MISSING = []; refresh(); }
+    if (D && OWNER) {
+      if (!MISS[OWNER]) refresh(OWNER);
+      if (D.name !== OWNER && !MISS[D.name]) refresh(D.name);
+    }
   };
   var origMode = window.setMode;
   window.setMode = function (m) { origMode(m); banner(); };
   // re-check when the app comes back to the front (e.g. opened from the home screen the next day)
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refresh(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible' || !D) return;
+    refresh(OWNER); if (D.name !== OWNER) refresh(D.name);
+  });
   var st = document.createElement('style');
   st.textContent =
     '.mban{background:#fff4e5;border:1.5px solid #ffb74d;color:#7a4100;border-radius:14px;padding:12px 14px;margin:0 0 12px}' +
-    '.mban.here{background:#e8f5e9;border-color:#81c784;color:#1b5e20}' +
+    '.mban.here{background:#e8f5e9;border-color:#81c784;color:#1b5e20}.mban.other{background:#e3f2fd;border-color:#90caf9;color:#0d47a1}' +
     '.mtitle{font-weight:700;font-size:15px}.msub{font-size:12px;margin-top:6px;opacity:.8}' +
     '.mchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.mchips button{border:0;background:#ef6c00;color:#fff;font-weight:700;font-size:13px;border-radius:16px;padding:7px 12px}' +
-    '.mban.here .mchips button{background:#455a64}' +
+    '.mban.here .mchips button{background:#455a64}.mban.other .mchips button{background:#1565c0}' +
     '#tabs button{position:relative}.mbadge{position:absolute;top:-6px;right:-4px;background:#e53935;color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;line-height:20px;border-radius:10px;padding:0 5px;box-shadow:0 0 0 2px #263238}';
   document.head.appendChild(st);
-  if (typeof D !== 'undefined' && D && OWNER) { MISSING = []; refresh(); }   // page already loaded before this file
+  if (typeof D !== 'undefined' && D && OWNER) { refresh(OWNER); if (D.name !== OWNER) refresh(D.name); }   // page loaded before this code ran
 })();
 </script></body></html>
